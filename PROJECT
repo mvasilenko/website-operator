@@ -7,4 +7,14 @@ layout:
 - go.kubebuilder.io/v4
 projectName: website-operator
 repo: github.com/mvasilenko/helloworld-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: mvasilenko.me
+  group: dev
+  kind: Website
+  path: github.com/mvasilenko/helloworld-operator/api/v1
+  version: v1
 version: "3"
