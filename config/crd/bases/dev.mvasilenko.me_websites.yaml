@@ -35,10 +35,13 @@ spec:
           spec:
             description: WebsiteSpec defines the desired state of Website
             properties:
-              foo:
-                description: Foo is an example field of Website. Edit website_types.go
-                  to remove/update
+              imageTag:
+                description: ImageTag will be used to set the container image for
+                  the website to deploy
+                pattern: ^[-a-z0-9]*$
                 type: string
+            required:
+            - imageTag
             type: object
           status:
             description: WebsiteStatus defines the observed state of Website

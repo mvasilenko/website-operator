@@ -28,8 +28,9 @@ type WebsiteSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Website. Edit website_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// ImageTag will be used to set the container image for the website to deploy
+	//+kubebuilder:validation:Pattern=`^[-a-z0-9]*$`
+	ImageTag string `json:"imageTag"`
 }
 
 // WebsiteStatus defines the observed state of Website
