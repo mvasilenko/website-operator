@@ -85,6 +85,10 @@ func (r *WebsiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
             }
             deployment := appsv1.Deployment{}
             r.Client.Get(ctx, deploymentNamespacedName, &deployment)
+			// Update can be based on any or all fields of the resource. In this simple operator, only
+            // the imageTag field which is being provided by the custom resource will be validated.
+            currentImage := deployment.Spec.Template.Spec.Containers[0].Image
+            desiredImage := fmt.Sprintf("abangser/todo-local-storage:%s", customResource.Spec.ImageTag)
 		} else {
 			log.Error(err, fmt.Sprintf(`Failed to create deployment for website "%s"`, customResource.Name))
 			return ctrl.Result{}, err
