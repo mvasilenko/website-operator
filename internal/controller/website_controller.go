@@ -20,6 +20,10 @@ import (
 	"context"
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	//"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -38,6 +42,7 @@ type WebsiteReconciler struct {
 //+kubebuilder:rbac:groups=dev.mvasilenko.me,resources=websites,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=dev.mvasilenko.me,resources=websites/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=dev.mvasilenko.me,resources=websites/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -65,6 +70,13 @@ func (r *WebsiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Use the `ImageTag` field from the website spec to personalise the log
 	log.Info(fmt.Sprintf(`Hello from your new website reconciler with tag "%s"!`, customResource.Spec.ImageTag))
 
+	// Attempt to create the deployment and return error if it fails
+	err = r.Client.Create(ctx, newDeployment(customResource.Name, customResource.Namespace, customResource.Spec.ImageTag))
+	if err != nil {
+		log.Error(err, fmt.Sprintf(`Failed to create deployment for website "%s"`, customResource.Name))
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -73,4 +85,46 @@ func (r *WebsiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&devv1.Website{}).
 		Complete(r)
+}
+
+// Create a single reference for labels as it is a reused variable
+func setResourceLabels(name string) map[string]string {
+	return map[string]string{
+		"website": name,
+		"type":    "Website",
+	}
+}
+
+// Create a deployment with the correct field values. By creating this in a function,
+// it can be reused by all lifecycle functions (create, update, delete).
+func newDeployment(name, namespace, imageTag string) *appsv1.Deployment {
+	replicas := int32(2)
+
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    setResourceLabels(name),
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: setResourceLabels(name)},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: setResourceLabels(name)},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "nginx",
+							// This is a publicly available container.  Note the use of
+							//`imageTag` as defined by the original resource request spec.
+							Image: fmt.Sprintf("abangser/todo-local-storage:%s", imageTag),
+							Ports: []corev1.ContainerPort{{
+								ContainerPort: 80,
+							}},
+						},
+					},
+				},
+			},
+		},
+	}
 }
