@@ -1,0 +1,6 @@
+apiVersion: dev.mvasilenko.me/v1
+kind: Website
+metadata:
+  name: website-sample
+spec:
+  imageTag: latest

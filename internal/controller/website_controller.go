@@ -68,7 +68,14 @@ func (r *WebsiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	err := r.Client.Get(context.Background(), req.NamespacedName, customResource)
 	// If the resource does not match a "Website" resource type, return failure.
 	if err != nil {
-		return ctrl.Result{}, err
+		if errors.IsNotFound(err) {
+			// TODO: handle deletes gracefully
+			log.Info(fmt.Sprintf(`Custom resource for website "%s" does not exist`, req.Name))
+			return ctrl.Result{}, nil
+		} else {
+			log.Error(err, fmt.Sprintf(`Failed to retrieve custom resource "%s"`, req.Name))
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Use the `ImageTag` field from the website spec to personalise the log
