@@ -19,9 +19,11 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	//"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
@@ -71,18 +73,26 @@ func (r *WebsiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Use the `ImageTag` field from the website spec to personalise the log
 	log.Info(fmt.Sprintf(`Hello from your new website reconciler with tag "%s"!`, customResource.Spec.ImageTag))
 
-	// Attempt to create the deployment and return error if it fails
 	err = r.Client.Create(ctx, newDeployment(customResource.Name, customResource.Namespace, customResource.Spec.ImageTag))
 	if err != nil {
-		log.Error(err, fmt.Sprintf(`Failed to create deployment for website "%s"`, customResource.Name))
-		return ctrl.Result{}, err
+		if errors.IsAlreadyExists(err) {
+			log.Info(fmt.Sprintf(`Deployment for website "%s" already exists"`, customResource.Name))
+			// TODO: handle deployment updates gracefully
+		} else {
+			log.Error(err, fmt.Sprintf(`Failed to create deployment for website "%s"`, customResource.Name))
+			return ctrl.Result{}, err
+		}
 	}
 
-	// Attempt to create the service and return error if it fails
 	err = r.Client.Create(ctx, newService(customResource.Name, customResource.Namespace))
 	if err != nil {
-		log.Error(err, fmt.Sprintf(`Failed to create service for website "%s"`, customResource.Name))
-		return ctrl.Result{}, err
+		if errors.IsInvalid(err) && strings.Contains(err.Error(), "provided port is already allocated") {
+			log.Info(fmt.Sprintf(`Service for website "%s" already exists`, customResource.Name))
+			// TODO: handle service updates gracefully
+		} else {
+			log.Error(err, fmt.Sprintf(`Failed to create service for website "%s"`, customResource.Name))
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
