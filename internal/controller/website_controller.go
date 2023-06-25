@@ -28,6 +28,7 @@ import (
 
 	//"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -77,7 +78,13 @@ func (r *WebsiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			log.Info(fmt.Sprintf(`Deployment for website "%s" already exists"`, customResource.Name))
-			// TODO: handle deployment updates gracefully
+            // Retrieve the current deployment for this website
+            deploymentNamespacedName := types.NamespacedName{
+          	    Name:      customResource.Name,
+          	    Namespace: customResource.Namespace,
+            }
+            deployment := appsv1.Deployment{}
+            r.Client.Get(ctx, deploymentNamespacedName, &deployment)
 		} else {
 			log.Error(err, fmt.Sprintf(`Failed to create deployment for website "%s"`, customResource.Name))
 			return ctrl.Result{}, err
