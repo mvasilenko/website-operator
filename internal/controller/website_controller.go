@@ -78,17 +78,34 @@ func (r *WebsiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			log.Info(fmt.Sprintf(`Deployment for website "%s" already exists"`, customResource.Name))
-            // Retrieve the current deployment for this website
-            deploymentNamespacedName := types.NamespacedName{
-          	    Name:      customResource.Name,
-          	    Namespace: customResource.Namespace,
-            }
-            deployment := appsv1.Deployment{}
-            r.Client.Get(ctx, deploymentNamespacedName, &deployment)
+			// Retrieve the current deployment for this website
+			deploymentNamespacedName := types.NamespacedName{
+				Name:      customResource.Name,
+				Namespace: customResource.Namespace,
+			}
+			deployment := appsv1.Deployment{}
+			r.Client.Get(ctx, deploymentNamespacedName, &deployment)
 			// Update can be based on any or all fields of the resource. In this simple operator, only
-            // the imageTag field which is being provided by the custom resource will be validated.
-            currentImage := deployment.Spec.Template.Spec.Containers[0].Image
-            desiredImage := fmt.Sprintf("abangser/todo-local-storage:%s", customResource.Spec.ImageTag)
+			// the imageTag field which is being provided by the custom resource will be validated.
+			currentImage := deployment.Spec.Template.Spec.Containers[0].Image
+			desiredImage := fmt.Sprintf("abangser/todo-local-storage:%s", customResource.Spec.ImageTag)
+			if currentImage != desiredImage {
+				log.Info(fmt.Sprintf(`Image tag has updated from "%s" to "%s"`, currentImage, desiredImage))
+
+				// This operator only cares about the one field, it does not want
+				// to alter any other changes that may be acceptable. Therefore,
+				// this update will only patch the single field!
+				patch := client.StrategicMergeFrom(deployment.DeepCopy())
+				deployment.Spec.Template.Spec.Containers[0].Image = desiredImage
+				patch.Data(&deployment)
+
+				// Try and apply this patch, if it fails, return the failure
+				err := r.Client.Patch(ctx, &deployment, patch)
+				if err != nil {
+					log.Error(err, fmt.Sprintf(`Failed to update deployment for website "%s"`, customResource.Name))
+					return ctrl.Result{}, err
+				}
+			}
 		} else {
 			log.Error(err, fmt.Sprintf(`Failed to create deployment for website "%s"`, customResource.Name))
 			return ctrl.Result{}, err
